@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>스택형 개인 코드 도서관</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 설정 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+        /* 도서관 스타일 (짙은 배경) */
+        .library-bg {
+            background-color: #332d29; /* Dark wood/leather feel */
+        }
+        /* 책 스택 효과 */
+        .book-item {
+            position: relative;
+            transform-origin: top left;
+            transition: all 0.2s ease-out;
+            border-left: 6px solid #eab308; /* Amber accent */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .book-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+        .book-item.active {
+            background-color: #eab308;
+            color: #1c1917;
+            border-left: 6px solid #44403c;
+        }
+        /* 코드 에디터 스타일 */
+        .code-editor {
+            font-family: monospace;
+            min-height: 300px;
+            background-color: #1e1e1e; /* VS Code Dark */
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            resize: none;
+        }
+    </style>
+</head>
+<body class="p-6">
+
+    <div id="app" class="max-w-7xl mx-auto rounded-xl shadow-2xl overflow-hidden border border-gray-200">
+        
+        <!-- Header -->
+        <header class="library-bg p-4 text-white flex justify-between items-center">
+            <h1 class="text-3xl font-bold tracking-wider">
+                <span class="text-yellow-400">📜</span> 나의 코드 도서관
+            </h1>
+            <div class="text-sm">
+                <p>사용자 ID: <span id="user-id" class="font-mono text-yellow-300">로딩 중...</span></p>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="flex h-[80vh] bg-white">
+            
+            <!-- Sidebar: Project List (Book Stack) -->
+            <aside class="w-80 library-bg p-4 overflow-y-auto border-r border-gray-700">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-yellow-400">📚 프로젝트 스택</h2>
+                    <button onclick="window.showModal('new-project-modal')" class="bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold py-1 px-3 rounded-full transition duration-150 shadow-md">
+                        + 새 책 추가
+                    </button>
+                </div>
+                <div id="project-list" class="space-y-3">
+                    <!-- 프로젝트 목록이 여기에 동적으로 렌더링됩니다. -->
+                </div>
+            </aside>
+
+            <!-- Main Content: File Viewer and Editor -->
+            <main class="flex-1 p-6 overflow-y-auto">
+                <div id="loading-spinner" class="text-center py-20 text-gray-500 hidden">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+                    <p class="mt-4">데이터 로딩 중...</p>
+                </div>
+
+                <div id="content-area" class="hidden">
+                    
+                    <!-- Current Project Info & Actions -->
+                    <div class="flex justify-between items-center pb-4 border-b border-gray-200 mb-6">
+                        <div class="flex items-center">
+                            <h3 id="current-project-title" class="text-2xl font-bold text-gray-800 mr-4">프로젝트를 선택하세요.</h3>
+                            <button id="rename-project-btn" onclick="window.renameProjectPrompt()" class="text-sm text-blue-500 hover:text-blue-700 transition duration-150 disabled:opacity-50" disabled>
+                                (제목 변경)
+                            </button>
+                        </div>
+                        <button id="add-file-btn" onclick="window.showFileModal()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg shadow transition duration-150 disabled:opacity-50" disabled>
+                            + 새 파일 추가
+                        </button>
+                    </div>
+
+                    <!-- File Tabs -->
+                    <div id="file-tabs" class="flex flex-wrap border-b border-gray-300 mb-4">
+                        <!-- 파일 탭이 여기에 렌더링됩니다. -->
+                    </div>
+
+                    <!-- Code Viewer/Editor -->
+                    <div id="code-viewer-container" class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 id="current-file-name" class="text-xl font-medium text-gray-700"></h4>
+                            <div id="file-actions" class="space-x-2">
+                                <button id="rename-file-btn" onclick="window.renameFilePrompt()" class="text-sm text-blue-500 hover:text-blue-700 transition duration-150 hidden">
+                                    파일명 변경
+                                </button>
+                                <button id="delete-file-btn" onclick="window.deleteFile()" class="text-sm text-red-500 hover:text-red-700 transition duration-150 hidden">
+                                    파일 삭제
+                                </button>
+                                <button id="delete-project-btn" onclick="window.deleteProjectPrompt()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-1 px-3 rounded-md transition duration-150 ml-4 hidden">
+                                    프로젝트 삭제
+                                </button>
+                            </div>
+                        </div>
+
+                        <textarea id="code-editor" class="code-editor w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500" placeholder="// 코드를 여기에 입력하세요."></textarea>
+                        
+                        <button onclick="window.saveFileContent()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-lg shadow-lg transition duration-150">
+                            💾 코드 저장
+                        </button>
+                    </div>
+
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal for New Project -->
+    <div id="new-project-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+            <h3 class="text-xl font-bold mb-4">새 프로젝트 (책) 추가</h3>
+            <input type="text" id="new-project-name" class="w-full p-3 border border-gray-300 rounded-md mb-4 focus:ring-amber-500 focus:border-amber-500" placeholder="프로젝트 이름 (예: Python Calculator)">
+            <div class="flex justify-end space-x-2">
+                <button onclick="window.hideModal('new-project-modal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md">취소</button>
+                <button onclick="window.addNewProject()" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-md">추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for New File -->
+    <div id="new-file-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden z-50 flex items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-96">
+            <h3 class="text-xl font-bold mb-4">새 파일 추가</h3>
+            <input type="text" id="new-file-name" class="w-full p-3 border border-gray-300 rounded-md mb-4 focus:ring-amber-500 focus:border-amber-500" placeholder="파일명 (예: main.py, README.md)">
+            <div class="flex justify-end space-x-2">
+                <button onclick="window.hideModal('new-file-modal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded-md">취소</button>
+                <button onclick="window.addNewFile()" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-md">추가</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status Message Box (Replaces alert()) -->
+    <div id="status-message-box" class="fixed top-5 right-5 p-4 rounded-lg text-white shadow-lg transition-transform duration-300 transform translate-x-full hidden" role="alert">
+        <p id="status-message-text"></p>
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, orderBy, setDoc, addDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Firestore 디버그 로깅 설정
+        setLogLevel('Debug');
+
+        // 전역 변수 설정 (Firebase, Auth, State)
+        let db, auth;
+        let userId = null;
+        let currentProjectId = null;
+        let currentFileId = null;
+        let projects = [];
+        
+        // Canvas 전역 변수 가져오기
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // UI 요소
+        const projectListElement = document.getElementById('project-list');
+        const codeEditorElement = document.getElementById('code-editor');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const contentArea = document.getElementById('content-area');
+        const fileTabsContainer = document.getElementById('file-tabs');
+        
+        // --- 유틸리티 및 UI 함수 (Globalize functions used in inline handlers) ---
+
+        // 상태 메시지 표시 (alert() 대체)
+        window.showStatus = function(message, isError = false) {
+            const box = document.getElementById('status-message-box');
+            const text = document.getElementById('status-message-text');
+            
+            text.textContent = message;
+            box.classList.remove('hidden', 'bg-green-500', 'bg-red-500');
+            box.classList.add(isError ? 'bg-red-500' : 'bg-green-500');
+            box.classList.remove('translate-x-full');
+            box.classList.add('translate-x-0');
+
+            setTimeout(() => {
+                box.classList.remove('translate-x-0');
+                box.classList.add('translate-x-full');
+                setTimeout(() => box.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        window.showModal = function(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        window.hideModal = function(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        
+        // 파일 ID 생성 (simple unique ID for file items within a document)
+        function generateFileId() {
+            return 'file_' + Date.now() + Math.random().toString(36).substring(2, 9);
+        }
+
+        // --- Firebase 초기화 및 인증 ---
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                console.error("Firebase configuration is missing.");
+                window.showStatus("Firebase 설정 오류. 앱을 로드할 수 없습니다.", true);
+                return;
+            }
+
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                loadingSpinner.classList.remove('hidden');
+                
+                // 인증 상태 리스너 설정
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                    } else {
+                        // 초기 토큰이 있으면 사용하고, 없으면 익명 로그인
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            userId = auth.currentUser.uid;
+                        } else {
+                            await signInAnonymously(auth);
+                            userId = auth.currentUser.uid;
+                        }
+                    }
+
+                    if (userId) {
+                        document.getElementById('user-id').textContent = userId;
+                        // 인증 완료 후 데이터 리스너 시작
+                        listenForProjects();
+                    } else {
+                        loadingSpinner.classList.add('hidden');
+                        window.showStatus("인증에 실패했습니다. 다시 시도해주세요.", true);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase 초기화 중 오류 발생:", error);
+                window.showStatus("Firebase 초기화 중 치명적인 오류 발생.", true);
+            }
+        }
+
+        // --- Firestore 데이터 관리 ---
+
+        function getCollectionPath() {
+            // Firestore 보안 규칙에 따라 사용자별 PRIVATE 경로를 사용합니다.
+            return `/artifacts/${appId}/users/${userId}/code_library_projects`;
+        }
+        
+        function listenForProjects() {
+            if (!userId) return;
+
+            const projectsRef = collection(db, getCollectionPath());
+            // 정렬 기능은 Firestore의 orderBy 없이 JS에서 처리하기 위해 주석 처리
+            const q = query(projectsRef); // , orderBy('createdAt', 'desc'));
+
+            // 실시간 리스너 설정
+            onSnapshot(q, (snapshot) => {
+                projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // 생성 날짜를 기준으로 로컬에서 내림차순 정렬 (최신 프로젝트가 위로)
+                projects.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+                
+                renderProjectList();
+                
+                // 첫 로드 시 또는 현재 프로젝트가 삭제/변경되었을 경우 처리
+                if (projects.length > 0 && !projects.find(p => p.id === currentProjectId)) {
+                    window.selectProject(projects[0].id);
+                } else if (projects.length > 0 && currentProjectId) {
+                    // 현재 프로젝트가 여전히 존재하면 파일 목록만 업데이트
+                    window.selectProject(currentProjectId);
+                } else if (projects.length === 0) {
+                    // 프로젝트가 없으면 초기화
+                    clearContentArea();
+                }
+                
+                loadingSpinner.classList.add('hidden');
+                contentArea.classList.remove('hidden');
+            }, (error) => {
+                console.error("Firestore 리스너 오류:", error);
+                window.showStatus("프로젝트 목록 로드 중 오류 발생.", true);
+            });
+        }
+
+        // --- CRUD 함수: 프로젝트 (Globalized functions) ---
+
+        window.addNewProject = async function() {
+            const nameInput = document.getElementById('new-project-name');
+            const projectName = nameInput.value.trim();
+            window.hideModal('new-project-modal');
+            nameInput.value = '';
+
+            if (projectName === "") {
+                window.showStatus("프로젝트 이름을 입력해주세요.", true);
+                return;
+            }
+
+            try {
+                const newProjectData = {
+                    name: projectName,
+                    createdAt: new Date(),
+                    files: [{
+                        id: generateFileId(),
+                        name: 'README.md',
+                        content: `# ${projectName}\n\n이것은 당신의 첫 번째 파일입니다. 코드를 입력하세요!`,
+                        lastModified: new Date()
+                    }]
+                };
+
+                const projectsRef = collection(db, getCollectionPath());
+                const docRef = await addDoc(projectsRef, newProjectData);
+                window.selectProject(docRef.id);
+                window.showStatus(`프로젝트 '${projectName}'가 추가되었습니다.`);
+            } catch (e) {
+                console.error("프로젝트 추가 실패:", e);
+                window.showStatus("프로젝트 추가 중 오류가 발생했습니다.", true);
+            }
+        }
+
+        window.renameProjectPrompt = function() {
+            if (!currentProjectId) return;
+            const project = projects.find(p => p.id === currentProjectId);
+            // prompt는 기본적으로 전역 함수이므로 window를 붙이지 않아도 되지만, 통일성을 위해 유지
+            const newName = window.prompt(`새 프로젝트 이름 입력:`, project.name);
+            
+            if (newName && newName.trim() !== "" && newName.trim() !== project.name) {
+                renameProject(newName.trim());
+            }
+        }
+
+        async function renameProject(newName) {
+            if (!currentProjectId) return;
+            try {
+                const docRef = doc(db, getCollectionPath(), currentProjectId);
+                await updateDoc(docRef, { name: newName });
+                window.showStatus(`프로젝트 이름이 '${newName}'로 변경되었습니다.`);
+            } catch (e) {
+                console.error("프로젝트 이름 변경 실패:", e);
+                window.showStatus("프로젝트 이름 변경 중 오류가 발생했습니다.", true);
+            }
+        }
+        
+        window.deleteProjectPrompt = function() {
+            if (!currentProjectId) return;
+            const project = projects.find(p => p.id === currentProjectId);
+            
+            if (window.confirm(`정말로 프로젝트 '${project.name}'을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+                deleteProject();
+            }
+        }
+
+        async function deleteProject() {
+            if (!currentProjectId) return;
+            try {
+                await deleteDoc(doc(db, getCollectionPath(), currentProjectId));
+                currentProjectId = null;
+                currentFileId = null;
+                window.showStatus("프로젝트가 성공적으로 삭제되었습니다.");
+            } catch (e) {
+                console.error("프로젝트 삭제 실패:", e);
+                window.showStatus("프로젝트 삭제 중 오류가 발생했습니다.", true);
+            }
+        }
+
+        // --- CRUD 함수: 파일 (File is an object within the Project document, Globalized functions) ---
+
+        window.showFileModal = function() {
+            if (!currentProjectId) return;
+            window.showModal('new-file-modal');
+        }
+
+        window.addNewFile = async function() {
+            const nameInput = document.getElementById('new-file-name');
+            const fileName = nameInput.value.trim();
+            window.hideModal('new-file-modal');
+            nameInput.value = '';
+
+            if (fileName === "") {
+                window.showStatus("파일 이름을 입력해주세요.", true);
+                return;
+            }
+            
+            const project = projects.find(p => p.id === currentProjectId);
+            if (project.files.some(f => f.name === fileName)) {
+                window.showStatus("같은 이름의 파일이 이미 존재합니다.", true);
+                return;
+            }
+
+            try {
+                const newFile = {
+                    id: generateFileId(),
+                    name: fileName,
+                    content: `// 파일: ${fileName}\n`,
+                    lastModified: new Date()
+                };
+
+                const docRef = doc(db, getCollectionPath(), currentProjectId);
+                await updateDoc(docRef, {
+                    files: arrayUnion(newFile)
+                });
+                
+                // 새 파일 추가 후 바로 선택
+                window.selectFile(newFile.id);
+                window.showStatus(`파일 '${fileName}'가 추가되었습니다.`);
+
+            } catch (e) {
+                console.error("파일 추가 실패:", e);
+                window.showStatus("파일 추가 중 오류가 발생했습니다.", true);
+            }
+        }
+        
+        window.saveFileContent = async function() {
+            if (!currentProjectId || !currentFileId) {
+                window.showStatus("프로젝트와 파일을 선택해주세요.", true);
+                return;
+            }
+
+            const newContent = codeEditorElement.value;
+            const project = projects.find(p => p.id === currentProjectId);
+            const fileToUpdate = project.files.find(f => f.id === currentFileId);
+
+            if (!fileToUpdate) return;
+            
+            // 기존 파일 배열에서 해당 파일을 제거
+            const updatedFiles = project.files.filter(f => f.id !== currentFileId);
+
+            // 업데이트된 내용으로 새 파일 객체 생성
+            const updatedFile = {
+                ...fileToUpdate,
+                content: newContent,
+                lastModified: new Date()
+            };
+            updatedFiles.push(updatedFile);
+
+            try {
+                const docRef = doc(db, getCollectionPath(), currentProjectId);
+                // 파일을 통째로 덮어쓰기 (ArrayUnion/ArrayRemove는 객체 업데이트가 복잡하므로 전체 덮어쓰기)
+                await setDoc(docRef, { ...project, files: updatedFiles, lastModified: new Date() });
+                
+                window.showStatus("코드 내용이 성공적으로 저장되었습니다.");
+            } catch (e) {
+                console.error("코드 저장 실패:", e);
+                window.showStatus("코드 저장 중 오류가 발생했습니다.", true);
+            }
+        }
+        
+        window.renameFilePrompt = function() {
+            if (!currentProjectId || !currentFileId) return;
+            const project = projects.find(p => p.id === currentProjectId);
+            const file = project.files.find(f => f.id === currentFileId);
+            
+            const newName = window.prompt(`새 파일 이름 입력:`, file.name);
+            
+            if (newName && newName.trim() !== "" && newName.trim() !== file.name) {
+                renameFile(newName.trim());
+            }
+        }
+        
+        async function renameFile(newName) {
+            if (!currentProjectId || !currentFileId) return;
+            const project = projects.find(p => p.id === currentProjectId);
+            const newNameTrimmed = newName.trim();
+            
+            if (project.files.some(f => f.name === newNameTrimmed && f.id !== currentFileId)) {
+                window.showStatus("같은 이름의 파일이 이미 존재합니다.", true);
+                return;
+            }
+            
+            try {
+                // 파일 배열 업데이트
+                const updatedFiles = project.files.map(f => {
+                    if (f.id === currentFileId) {
+                        return { ...f, name: newNameTrimmed, lastModified: new Date() };
+                    }
+                    return f;
+                });
+                
+                const docRef = doc(db, getCollectionPath(), currentProjectId);
+                await updateDoc(docRef, { files: updatedFiles });
+                
+                window.showStatus(`파일명이 '${newNameTrimmed}'로 변경되었습니다.`);
+            } catch (e) {
+                console.error("파일명 변경 실패:", e);
+                window.showStatus("파일명 변경 중 오류가 발생했습니다.", true);
+            }
+        }
+
+        window.deleteFile = function() {
+            if (!currentProjectId || !currentFileId) return;
+            const project = projects.find(p => p.id === currentProjectId);
+            const file = project.files.find(f => f.id === currentFileId);
+            
+            if (project.files.length === 1) {
+                window.showStatus("프로젝트에는 최소한 하나의 파일이 있어야 합니다. 이 파일을 삭제하려면 프로젝트 전체를 삭제해야 합니다.", true);
+                return;
+            }
+
+            if (window.confirm(`정말로 파일 '${file.name}'을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+                try {
+                    const updatedFiles = project.files.filter(f => f.id !== currentFileId);
+                    
+                    const docRef = doc(db, getCollectionPath(), currentProjectId);
+                    updateDoc(docRef, { files: updatedFiles });
+
+                    // 다음 파일 선택
+                    currentFileId = updatedFiles[0]?.id || null;
+                    if (currentFileId) {
+                        window.selectFile(currentFileId);
+                    } else {
+                        // 남은 파일이 없으면 에디터 비우기
+                        codeEditorElement.value = '';
+                    }
+
+                    window.showStatus(`파일 '${file.name}'가 삭제되었습니다.`);
+                } catch (e) {
+                    console.error("파일 삭제 실패:", e);
+                    window.showStatus("파일 삭제 중 오류가 발생했습니다.", true);
+                }
+            }
+        }
+
+        // --- UI 상호작용 함수 ---
+        
+        function clearContentArea() {
+            document.getElementById('current-project-title').textContent = "프로젝트를 선택하거나 새로 추가하세요.";
+            document.getElementById('current-file-name').textContent = "";
+            fileTabsContainer.innerHTML = '';
+            codeEditorElement.value = '';
+            document.getElementById('rename-project-btn').disabled = true;
+            document.getElementById('add-file-btn').disabled = true;
+            document.getElementById('delete-project-btn').classList.add('hidden');
+            document.getElementById('rename-file-btn').classList.add('hidden');
+            document.getElementById('delete-file-btn').classList.add('hidden');
+        }
+
+        function renderProjectList() {
+            projectListElement.innerHTML = ''; // 초기화
+
+            if (projects.length === 0) {
+                 projectListElement.innerHTML = '<p class="text-gray-400 text-sm mt-4 p-2">현재 도서관에 책이 없습니다. 새 책을 추가해보세요!</p>';
+                 clearContentArea();
+                 return;
+            }
+            
+            projects.forEach(project => {
+                const isActive = project.id === currentProjectId;
+                
+                const item = document.createElement('div');
+                item.classList.add('book-item', 'bg-stone-700', 'text-white', 'p-3', 'rounded-lg', 'cursor-pointer');
+                if (isActive) {
+                    item.classList.add('active');
+                }
+                item.textContent = project.name;
+                item.dataset.projectId = project.id;
+                
+                item.addEventListener('click', () => window.selectProject(project.id));
+                projectListElement.appendChild(item);
+            });
+        }
+        
+        window.selectProject = function(projectId) {
+            currentProjectId = projectId;
+            const project = projects.find(p => p.id === projectId);
+            
+            if (!project) return;
+            
+            // UI 업데이트
+            document.getElementById('current-project-title').textContent = project.name;
+            document.getElementById('rename-project-btn').disabled = false;
+            document.getElementById('add-file-btn').disabled = false;
+            document.getElementById('delete-project-btn').classList.remove('hidden');
+
+            // 프로젝트 목록 활성화
+            document.querySelectorAll('.book-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-project-id="${projectId}"]`).classList.add('active');
+
+            renderFileTabs(project.files);
+            
+            // 메인 파일 또는 첫 번째 파일 선택
+            let fileToSelect = project.files[0];
+            if (currentFileId) {
+                const existingFile = project.files.find(f => f.id === currentFileId);
+                if (existingFile) fileToSelect = existingFile;
+            }
+            
+            if (fileToSelect) {
+                window.selectFile(fileToSelect.id);
+            }
+        }
+        
+        function renderFileTabs(files) {
+            fileTabsContainer.innerHTML = '';
+            
+            files.forEach(file => {
+                const tab = document.createElement('button');
+                tab.classList.add('py-2', 'px-4', 'font-medium', 'text-sm', 'transition', 'duration-150', 'border-t', 'border-x', 'rounded-t-lg', 'focus:outline-none');
+                
+                if (file.id === currentFileId) {
+                    tab.classList.add('bg-white', 'text-amber-600', 'border-gray-300', 'border-b-white', 'z-10');
+                } else {
+                    tab.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-gray-200', 'border-transparent', 'border-b-gray-300');
+                }
+
+                tab.textContent = file.name;
+                tab.dataset.fileId = file.id;
+                tab.addEventListener('click', () => window.selectFile(file.id));
+                
+                fileTabsContainer.appendChild(tab);
+            });
+        }
+        
+        window.selectFile = function(fileId) {
+            currentFileId = fileId;
+            const project = projects.find(p => p.id === currentProjectId);
+            if (!project) return;
+            
+            const file = project.files.find(f => f.id === fileId);
+            if (!file) return;
+
+            // 에디터 업데이트
+            codeEditorElement.value = file.content || '';
+            document.getElementById('current-file-name').textContent = `[${file.name}]`;
+            
+            // 파일 액션 버튼 보이기
+            document.getElementById('rename-file-btn').classList.remove('hidden');
+            document.getElementById('delete-file-btn').classList.remove('hidden');
+
+            // 탭 UI 업데이트
+            renderFileTabs(project.files);
+        }
+
+        // --- 앱 시작 ---
+        initFirebase();
+    </script>
+</body>
+</html>
